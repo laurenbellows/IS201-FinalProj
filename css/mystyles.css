@@ -1,0 +1,27 @@
+body {
+    background-color: cornsilk;
+    font-family:'Courier New', Courier, monospace
+}
+
+h1 {
+    font-style: italic;
+    color:darkolivegreen
+}
+
+h2 {
+    color:darkolivegreen
+}
+
+#scaled-wrapper {
+    width: 100%;           /* This keeps it the size you want on your page */
+    aspect-ratio: 16 / 9; /* Or whatever shape you want the 'window' to be */
+    overflow: hidden;     /* Hides the parts that would usually overflow */
+    position: relative;
+}
+
+#scaled-wrapper .tableauPlaceholder {
+    transform: scale(0.5); /* Shrinks the content to 50% of its original size */
+    transform-origin: 0 0; /* Keeps it pinned to the top-left corner */
+    width: 200% !important; /* Offsets the scale so it fills the width */
+}
+

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lego Physics Challenge</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #2c3e50;
+            color: white;
+            overflow: hidden;
+        }
+
+        #hud {
+            background: #1a1a1a;
+            padding: 15px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-bottom: 4px solid #f1c40f;
+            z-index: 10;
+        }
+
+        .game-container {
+            display: flex;
+            flex-grow: 1;
+        }
+
+        #brick-bin {
+            width: 120px;
+            background: #34495e;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 5;
+        }
+
+        #build-area {
+            flex-grow: 1;
+            position: relative;
+            background: #ecf0f1;
+            border-bottom: 20px solid #95a5a6;
+        }
+
+        .lego {
+            width: 80px;
+            height: 30px;
+            cursor: grab;
+            border-radius: 4px;
+            position: absolute; /* Changed to handle dynamic placement */
+            border: 1px solid rgba(0,0,0,0.2);
+            transition: transform 0.5s ease-in, top 0.5s ease-in, opacity 0.5s;
+        }
+
+        /* The Falling Animation Class */
+        .falling {
+            pointer-events: none;
+            transform: translateY(500px) rotate(45deg);
+            opacity: 0;
+        }
+
+        #balance-container {
+            width: 200px;
+            height: 20px;
+            background: #555;
+            border-radius: 10px;
+            position: relative;
+        }
+        #balance-indicator {
+            width: 10px;
+            height: 100%;
+            background: #e74c3c;
+            position: absolute;
+            left: 50%;
+            transition: left 0.2s;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 20px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="hud">
+    <div>Time: <span id="timer">30</span>s</div>
+    <div>Bricks: <span id="count">0</span>/10</div>
+    <div>Best: <span id="best">0</span></div>
+    <div id="balance-container"><div id="balance-indicator"></div></div>
+</div>
+
+<div class="game-container">
+    <div id="brick-bin">
+        <div class="lego" draggable="true" ondragstart="drag(event)" style="background: #e63946; position: static;"></div>
+        <div class="lego" draggable="true" ondragstart="drag(event)" style="background: #3498db; position: static;"></div>
+        <div class="lego" draggable="true" ondragstart="drag(event)" style="background: #f1c40f; position: static;"></div>
+    </div>
+
+    <div id="build-area" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+</div>
+
+<div id="overlay">
+    <h1 id="status-text">YOU LOST</h1>
+    <p id="final-score"></p>
+    <button onclick="location.reload()">Play Again</button>
+</div>
+
+<script>
+    let timeLeft = 30;
+    let score = 0;
+    let towerBalance = 0;
+    const maxLean = 60; // Harder balance limit
+    let gameActive = true;
+    
+    let highScore = localStorage.getItem('legoHighScore') || 0;
+    document.getElementById('best').innerText = highScore;
+
+    const timerInterval = setInterval(() => {
+        if (!gameActive) return;
+        timeLeft--;
+        document.getElementById('timer').innerText = timeLeft;
+        if (timeLeft <= 0) endGame(score >= 10 ? "YOU WIN!" : "TIME OUT!");
+    }, 1000);
+
+    function allowDrop(ev) { ev.preventDefault(); }
+
+    function drag(ev) {
+        if (!gameActive) return;
+        ev.dataTransfer.setData("color", ev.target.style.backgroundColor);
+    }
+
+    function drop(ev) {
+        ev.preventDefault();
+        if (!gameActive) return;
+
+        const color = ev.dataTransfer.getData("color");
+        const buildArea = document.getElementById('build-area');
+        const rect = buildArea.getBoundingClientRect();
+        
+        const dropX = ev.clientX - rect.left;
+        const areaCenter = rect.width / 2;
+        
+        // Update physics: dropping away from center tilts the tower
+        towerBalance += (dropX - areaCenter) * 0.4;
+        updateBalanceMeter();
+
+        if (Math.abs(towerBalance) > maxLean) {
+            triggerFall();
+            return;
+        }
+
+        score++;
+        document.getElementById('count').innerText = score;
+        const brick = document.createElement("div");
+        brick.className = "lego";
+        brick.style.backgroundColor = color;
+        brick.style.left = (dropX - 40) + "px";
+        brick.style.bottom = ((score - 1) * 31) + "px";
+        
+        buildArea.appendChild(brick);
+    }
+
+    function updateBalanceMeter() {
+        const indicator = document.getElementById('balance-indicator');
+        let percent = 50 + (towerBalance / maxLean * 50);
+        indicator.style.left = Math.max(0, Math.min(100, percent)) + "%";
+    }
+
+    function triggerFall() {
+        gameActive = false;
+        const bricks = document.querySelectorAll('#build-area .lego');
+        const direction = towerBalance > 0 ? 1 : -1;
+
+        bricks.forEach((brick, index) => {
+            // Delay each brick slightly to look like a chain reaction
+            setTimeout(() => {
+                brick.style.transform = `translate(${direction * 200}px, 500px) rotate(${direction * 90}deg)`;
+                brick.style.opacity = "0";
+            }, index * 50);
+        });
+
+        setTimeout(() => endGame("YOU LOST"), 1000);
+    }
+
+    function endGame(msg) {
+        clearInterval(timerInterval);
+        document.getElementById('overlay').style.display = 'flex';
+        document.getElementById('status-text').innerText = msg;
+        document.getElementById('final-score').innerText = `Final Height: ${score}`;
+
+        if (score > highScore && msg !== "YOU LOST") {
+            localStorage.setItem('legoHighScore', score);
+        }
+    }
+</script>
+
+</body>
+</html>
